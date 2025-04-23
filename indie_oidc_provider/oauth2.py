@@ -1,5 +1,7 @@
+from authlib.integrations.flask_oauth2 import ResourceProtector
 from authlib.integrations.flask_oauth2 import (
-    AuthorizationServer, ResourceProtector)
+    AuthorizationServer as _AuthorizationServer,
+)
 from authlib.integrations.sqla_oauth2 import (
     create_query_client_func,
     create_save_token_func,
@@ -18,13 +20,24 @@ from werkzeug.security import gen_salt
 from .models import db, User
 from .models import OAuth2Client, OAuth2AuthorizationCode, OAuth2Token
 
+from flask import current_app
 
-DUMMY_JWT_CONFIG = {
-    'key': 'secret-key',
-    'alg': 'HS256',
-    'iss': 'https://authlib.org',
-    'exp': 3600,
-}
+
+# DUMMY_JWT_CONFIG = {
+#     "key": "secret",
+#     "alg": "HS256",
+#     "iss": "https://authlib.org",
+#     "exp": 3600,
+# }
+# DUMMY_JWT_CONFIG = {
+#     "crv": "P-256",
+#     "d": "p9Bbmkr0mrqE3HuYqR4hdblH85BO3jiaKI3DQo_YjeY",
+#     "kid": "exapmle",
+#     "kty": "EC",
+#     "x": "Kp9RBOl7QILm9KSbgSaCQbj1OSFLFE7Euvk3hnDlTqo",
+#     "y": "TOH8T09IfxObId_g0IlKOPXU-9jiDPylXV5iKsNSedI",
+# }
+
 
 def exists_nonce(nonce, req):
     exists = OAuth2AuthorizationCode.query.filter_by(
@@ -39,7 +52,7 @@ def generate_user_info(user, scope):
 
 def create_authorization_code(client, grant_user, request):
     code = gen_salt(48)
-    nonce = request.data.get('nonce')
+    nonce = request.data.get("nonce")
     item = OAuth2AuthorizationCode(
         code=code,
         client_id=client.client_id,
@@ -54,12 +67,15 @@ def create_authorization_code(client, grant_user, request):
 
 
 class AuthorizationCodeGrant(_AuthorizationCodeGrant):
-    def create_authorization_code(self, client, grant_user, request):
-        return create_authorization_code(client, grant_user, request)
+    # def create_authorization_code(self, client, grant_user, request):
+    #     code = create_authorization_code(client, grant_user, request)
+    #     print(f"Code: {code} created")
+    #     return code
 
     def parse_authorization_code(self, code, client):
         item = OAuth2AuthorizationCode.query.filter_by(
-            code=code, client_id=client.client_id).first()
+            code=code, client_id=client.client_id
+        ).first()
         if item and not item.is_expired():
             return item
 
@@ -70,13 +86,43 @@ class AuthorizationCodeGrant(_AuthorizationCodeGrant):
     def authenticate_user(self, authorization_code):
         return User.query.get(authorization_code.user_id)
 
+    def query_authorization_code(self, code, client):
+        exists = OAuth2AuthorizationCode.query.filter_by(
+            code=code, client_id=client.client_id
+        ).first()
+        if exists:
+            return exists
+
+    def save_authorization_code(self, code, request):
+        nonce = request.data.get("nonce")
+        client = request.client
+        user = request.user
+
+        item = OAuth2AuthorizationCode(
+            code=code,
+            client_id=client.client_id,
+            redirect_uri=request.redirect_uri,
+            scope=request.scope,
+            user_id=user.id,
+            nonce=nonce,
+        )
+        db.session.add(item)
+        db.session.commit()
+        return item
+
 
 class OpenIDCode(_OpenIDCode):
     def exists_nonce(self, nonce, request):
         return exists_nonce(nonce, request)
 
+    def get_audiences(self, request):
+        return ["zkLogin"]
+
     def get_jwt_config(self, grant):
-        return DUMMY_JWT_CONFIG
+        key = current_app.config["OAUTH2_JWT_KEY"]
+        alg = current_app.config["OAUTH2_JWT_ALG"]
+        iss = current_app.config["OAUTH2_JWT_ISS"]
+        return dict(key=key, alg=alg, iss=iss, exp=3600)
 
     def generate_user_info(self, user, scope):
         return generate_user_info(user, scope)
@@ -86,8 +132,14 @@ class ImplicitGrant(_OpenIDImplicitGrant):
     def exists_nonce(self, nonce, request):
         return exists_nonce(nonce, request)
 
+    def get_audiences(self, request):
+        return ["zkLogin"]
+
     def get_jwt_config(self, grant):
-        return DUMMY_JWT_CONFIG
+        key = current_app.config["OAUTH2_JWT_KEY"]
+        alg = current_app.config["OAUTH2_JWT_ALG"]
+        iss = current_app.config["OAUTH2_JWT_ISS"]
+        return dict(key=key, alg=alg, iss=iss, exp=3600)
 
     def generate_user_info(self, user, scope):
         return generate_user_info(user, scope)
@@ -97,33 +149,51 @@ class HybridGrant(_OpenIDHybridGrant):
     def create_authorization_code(self, client, grant_user, request):
         return create_authorization_code(client, grant_user, request)
 
+    def get_audiences(self, request):
+        return ["zkLogin"]
+
     def exists_nonce(self, nonce, request):
         return exists_nonce(nonce, request)
 
-    def get_jwt_config(self):
-        return DUMMY_JWT_CONFIG
+    def get_jwt_config(self, grant):
+        key = current_app.config["OAUTH2_JWT_KEY"]
+        alg = current_app.config["OAUTH2_JWT_ALG"]
+        iss = current_app.config["OAUTH2_JWT_ISS"]
+        return dict(key=key, alg=alg, iss=iss, exp=3600)
 
     def generate_user_info(self, user, scope):
         return generate_user_info(user, scope)
 
 
-authorization = AuthorizationServer()
+# class AuthorizationServer(_AuthorizationServer):
+#     def save_authorization_code(self, code, request):
+#         client = request.client
+#         item = OAuth2AuthorizationCode(
+#             code=code,
+#             client_id=client.client_id,
+#             redirect_uri=request.redirect_uri,
+#             scope=request.scope,
+#             user_id=request.user.id,
+#         )
+#         item.save()
+
+
+authorization = _AuthorizationServer()
 require_oauth = ResourceProtector()
 
 
 def config_oauth(app):
     query_client = create_query_client_func(db.session, OAuth2Client)
     save_token = create_save_token_func(db.session, OAuth2Token)
-    authorization.init_app(
-        app,
-        query_client=query_client,
-        save_token=save_token
-    )
+    authorization.init_app(app, query_client=query_client, save_token=save_token)
 
     # support all openid grants
-    authorization.register_grant(AuthorizationCodeGrant, [
-        OpenIDCode(require_nonce=True),
-    ])
+    authorization.register_grant(
+        AuthorizationCodeGrant,
+        [
+            OpenIDCode(require_nonce=True),
+        ],
+    )
     authorization.register_grant(ImplicitGrant)
     authorization.register_grant(HybridGrant)
 

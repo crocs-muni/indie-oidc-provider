@@ -1,0 +1,24 @@
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "indie_oidc_provider"
+authors = [
+    {name = "Hsiaoming Yang", email = "me@lepture.com"},
+    {name = "quapka", email = "quapka@gmail.com"},
+]
+description = "Simple OIDC provider"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "flask",
+    "flask-sqlalchemy",
+    "authlib",
+    "cryptography",
+]
+dynamic = ["version"]
+
+[project.scripts]
+indie-oidc-provider = "indie_oidc_provider:main"
