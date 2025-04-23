@@ -58,24 +58,18 @@
       in
       {
         devShells.default = pkgs.mkShell { inherit nativeBuildInputs propagatedBuildInputs buildInputs; };
-        packages.default = pkgs.python313Packages.buildPythonApplication {
-          pname = "indie-oidc-provider";
-          version = "0.1.0";
-          pyproject = true;
-          # format = "setuptools";
+        # packages.default = pkgs.python313Packages.buildPythonApplication {
+        #   pname = "indie-oidc-provider";
+        #   version = "0.1.0";
+        #   pyproject = true;
 
-          src = ./.;
+        #   src = ./.;
 
-          # There are no tests in the example OIDC provider
-          doCheck = false;
+        #   # There are no tests in the example OIDC provider
+        #   doCheck = false;
 
-          # installPhase = ''
-          #   mkdir $out
-          #   wrapProgram ${pkgs.python313Packages.flask}
-          # '';
-
-          inherit nativeBuildInputs propagatedBuildInputs buildInputs;
-        };
+        #   inherit nativeBuildInputs propagatedBuildInputs buildInputs;
+        # };
       }
     );
 }
