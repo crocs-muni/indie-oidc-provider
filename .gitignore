@@ -1,2 +1,9 @@
 *.sqlite
 *.pyc
+
+instance/
+.envrc
+result
+.direnv/
+
+dist/
